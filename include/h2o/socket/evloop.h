@@ -53,6 +53,8 @@ struct st_h2o_timeout_backend_properties_t {
 
 h2o_socket_t *h2o_evloop_socket_create(h2o_evloop_t *loop, int fd, int flags);
 h2o_socket_t *h2o_evloop_socket_accept(h2o_socket_t *listener);
+int h2o_evloop_socket_getopt(h2o_socket_t *sock, int level, int name, void *value, socklen_t *len);
+int h2o_evloop_socket_setopt(h2o_socket_t *sock, int level, int name, void *value, socklen_t len);
 
 h2o_evloop_t *h2o_evloop_create(void);
 void h2o_evloop_destroy(h2o_evloop_t *loop);

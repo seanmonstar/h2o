@@ -403,6 +403,19 @@ h2o_socket_t *h2o_evloop_socket_accept(h2o_socket_t *_listener)
     return &create_socket_set_nodelay(listener->loop, fd, H2O_SOCKET_FLAG_IS_ACCEPTED_CONNECTION)->super;
 }
 
+int h2o_evloop_socket_getopt(h2o_socket_t *_sock, int level, int name, void *value, socklen_t *len)
+{
+    struct st_h2o_evloop_socket_t *sock = (void *)_sock;
+    return getsockopt(sock->fd, level, name, value, len);
+}
+
+int h2o_evloop_socket_setopt(h2o_socket_t *_sock, int level, int name, void *value, socklen_t len)
+{
+    struct st_h2o_evloop_socket_t *sock = (void *)_sock;
+    return setsockopt(sock->fd, level, name, value, len);
+}
+
+
 h2o_socket_t *h2o_socket_connect(h2o_loop_t *loop, struct sockaddr *addr, socklen_t addrlen, h2o_socket_cb cb)
 {
     int fd;
