@@ -20,12 +20,20 @@
  * IN THE SOFTWARE.
  */
 #include <inttypes.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include "h2o.h"
 #include "h2o/http1.h"
 #include "h2o/http2.h"
 #include "h2o/http2_internal.h"
+
+/* kernel-headers bundled with Ubuntu 14.04 does not have the constant defined in netinet/tcp.h */
+#if defined(__linux__) && !defined(TCP_NOTSENT_LOWAT)
+#define TCP_NOTSENT_LOWAT 25
+#endif
 
 static const h2o_iovec_t CONNECTION_PREFACE = {H2O_STRLIT("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")};
 
@@ -65,6 +73,16 @@ static void push_path(h2o_req_t *src_req, const char *abspath, size_t abspath_le
 static int foreach_request(h2o_context_t *ctx, int (*cb)(h2o_req_t *req, void *cbdata), void *cbdata);
 
 const h2o_protocol_callbacks_t H2O_HTTP2_CALLBACKS = {initiate_graceful_shutdown, foreach_request};
+
+static int limit_sendbuf_to_tcp_window_size(h2o_socket_t *sock)
+{
+#if H2O_USE_LIBUV || !defined(TCP_NOTSENT_LOWAT)
+    return -1;
+#else
+    int val = 0;
+    return h2o_evloop_socket_setopt(sock, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &val, sizeof(val));
+#endif
+}
 
 static int is_idle_stream_id(h2o_http2_conn_t *conn, uint32_t stream_id)
 {
@@ -881,6 +899,8 @@ static void on_upgrade_complete(void *_conn, h2o_socket_t *sock, size_t reqsize)
         return;
     }
 
+    limit_sendbuf_to_tcp_window_size(sock);
+
     conn->sock = sock;
     sock->data = conn;
     conn->_http1_req_input = sock->input;
@@ -1261,6 +1281,7 @@ void h2o_http2_accept(h2o_accept_ctx_t *ctx, h2o_socket_t *sock, struct timeval 
 {
     h2o_http2_conn_t *conn = create_conn(ctx->ctx, ctx->hosts, sock, connected_at);
     sock->data = conn;
+    limit_sendbuf_to_tcp_window_size(sock);
     h2o_socket_read_start(conn->sock, on_read);
     update_idle_timeout(conn);
     if (sock->input->size != 0)
